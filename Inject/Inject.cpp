@@ -1,6 +1,5 @@
 ﻿#include "pch.h"
 #include <iostream>
-#include <wchar.h>
 #include <Windows.h>
 #include <Psapi.h>
 
@@ -12,39 +11,50 @@ void out_error() {
 	LocalFree(p_msg_buf);
 }
 
-void inject(DWORD process_id, char const* dll_name) {
+void inject(DWORD process_id, const char* const dll_name) {
+	HANDLE h_process = nullptr;
+	char* remote_char_ptr = nullptr;
+	PTHREAD_START_ROUTINE thread_start_routine_ptr = nullptr;
+	HANDLE h_remote_thread = nullptr;
+	std::cout << "start inject!\n";
 	__try {
 		SetLastError(NO_ERROR);
-		HANDLE h_process = OpenProcess(PROCESS_CREATE_THREAD | PROCESS_VM_OPERATION | PROCESS_VM_WRITE, false, process_id);
+		std::cout << "Open Process Handle.\n";
+		h_process = OpenProcess(PROCESS_CREATE_THREAD | PROCESS_VM_OPERATION | PROCESS_VM_WRITE, false, process_id);
 		if (h_process == nullptr) {
 			out_error();
 			__leave;
 		}
-
-		char* remote_char_ptr = reinterpret_cast<char*>(VirtualAllocEx(h_process, nullptr, strlen(dll_name) + 1, MEM_COMMIT, PAGE_READWRITE));
+		std::cout << "Alloc Remote Memory.\n";
+		remote_char_ptr = reinterpret_cast<char*>(VirtualAllocEx(h_process, nullptr, strlen(dll_name) + 1, MEM_COMMIT, PAGE_READWRITE));
 		if (remote_char_ptr == nullptr) {
 			out_error();
 			__leave;
 		}
-
+		std::cout << "Write Remote Memory.\n";
 		if (!WriteProcessMemory(h_process, remote_char_ptr, dll_name, strlen(dll_name) + 1, nullptr)) {
 			out_error();
 			__leave;
 		}
-
-		PTHREAD_START_ROUTINE thread_start_routine_ptr = reinterpret_cast<PTHREAD_START_ROUTINE>(GetProcAddress(GetModuleHandle("Kerlen32"), "LoadLibraryA"));
+		std::cout << "Get LoadLibraryA Address.\n";
+		thread_start_routine_ptr = reinterpret_cast<PTHREAD_START_ROUTINE>(GetProcAddress(GetModuleHandle("Kernel32"), "LoadLibraryA"));
 		if (thread_start_routine_ptr == nullptr) {
 			out_error();
 			__leave;
 		}
-
-		HANDLE h_remote_thread = CreateRemoteThread(h_process, nullptr, 0, thread_start_routine_ptr, remote_char_ptr, 0, nullptr);
+		std::cout << "Create Remote Thread.\n";
+		h_remote_thread = CreateRemoteThread(h_process, nullptr, 0, thread_start_routine_ptr, remote_char_ptr, 0, nullptr);
 		if (h_remote_thread == nullptr) {
-
+			out_error();
+			__leave;
 		}
-
+		std::cout << "Wait Remote Thread.\n";
+		WaitForSingleObject(h_process, INFINITE);
+		std::cout << "Success.\n";
 	} __finally{
-
+		if (remote_char_ptr) VirtualFreeEx(h_process, remote_char_ptr, 0, MEM_RELEASE);
+		if (h_remote_thread) CloseHandle(h_remote_thread);
+		if (h_process) CloseHandle(h_process);
 	}
 }
 
@@ -52,7 +62,9 @@ void inject(DWORD process_id, char const* dll_name) {
 int main(int argc, char** argv) {
 
 	if (argc != 3) {
-		std::cerr << "Argment Error!\n";
+		std::cerr 
+		<< "Argument Error.\n"
+		<< "Inject process_id dll_name\n";
 		return 1;
 	}
 
