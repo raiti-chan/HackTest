@@ -3,6 +3,8 @@
 #include <tuple>
 #include <tchar.h>
 
+WNDPROC default_procedure_ptr = nullptr;
+
 HWND find_main_window(DWORD process_id) {
 	using type_enum_window_lparam = std::tuple<DWORD, HWND*>;
 
@@ -26,9 +28,9 @@ HWND find_main_window(DWORD process_id) {
 	return h_mainwindow;
 }
 
-LRESULT CALLBACK new_proc(HWND h_window, UINT, WPARAM, LPARAM) {
-
-	return 0;
+LRESULT CALLBACK new_proc(HWND h_window, UINT param, WPARAM w_param, LPARAM l_param) {
+	std::cout << "new_proc\n";
+	return default_procedure_ptr(h_window, param, w_param, l_param);
 }
 
 BOOL APIENTRY DllMain(HMODULE, DWORD  ul_reason_for_call, LPVOID) {
@@ -68,14 +70,31 @@ BOOL APIENTRY DllMain(HMODULE, DWORD  ul_reason_for_call, LPVOID) {
 			std::cerr << "Failed Insert Menu!\n";
 			__leave;
 		}
-		std::cout << "Success Instert Menu!\n";
+		std::cout << "Success Insert Menu!\n";
 
-		SetClassLongPtr(h_window, GCLP_WNDPROC, reinterpret_cast<LONG_PTR>(&new_proc));
+		default_procedure_ptr = reinterpret_cast<WNDPROC>(GetClassLongPtr(h_window, GCLP_WNDPROC));
+		if (default_procedure_ptr == nullptr) {
+			std::cerr << "Failed GetClassLongPtr!\n";
+			__leave;
+		}
+		std::cout << "Default Proc ptr : " << std::hex << reinterpret_cast<void*>(default_procedure_ptr) << "\n";
+
+		LONG_PTR old_value = SetClassLongPtr(h_window, GCLP_WNDPROC, reinterpret_cast<LONG_PTR>(&new_proc));
+		if (old_value == 0) {
+			std::cerr << "Failed SetClassLongPtr!\n";
+			__leave;
+		}
+		std::cout << "Success Switch WindowProcedure : " << std::hex << old_value << " -> " << std::hex << reinterpret_cast<void*>(&new_proc) << "\n";
+
+		std::cout << SetClassLongPtr(h_window, GCLP_HCURSOR, 0);
+
+		return_flag = true;
+
 	} __finally {
-		system("pause");
-		if (out) fclose(out);
-		if (err) fclose(err);
-		FreeConsole();
+		//system("pause");
+		//if (out) fclose(out);
+		//if (err) fclose(err);
+		//FreeConsole();
 	}
 	return return_flag;
 }
