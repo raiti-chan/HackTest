@@ -31,7 +31,7 @@ HWND find_main_window(DWORD process_id) {
 void gen_random_text(char* buf, unsigned int buf_size) {
 
 	for (unsigned int i = 0; i < buf_size - 1; i++) {
-		buf[i] = rand() % 94 + 33;
+		buf[i] = static_cast<char>(rand() % 94 + 33);
 	}
 	buf[buf_size - 1] = 0;
 }
@@ -110,7 +110,7 @@ BOOL APIENTRY DllMain(HMODULE, DWORD  ul_reason_for_call, LPVOID) {
 		gen_random_text(title, 16);
 		SetWindowTextA(h_window ,title);
 
-		/*** サブクラスを作ってしまうので SetClassLongPtrは使えない。
+		 サブクラスを作ってしまうので SetClassLongPtrは使えない。
 
 		default_procedure_ptr = reinterpret_cast<WNDPROC>(GetClassLongPtr(h_window, GCLP_WNDPROC));
 		if (default_procedure_ptr == nullptr) {
