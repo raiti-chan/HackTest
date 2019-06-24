@@ -28,6 +28,35 @@ HWND find_main_window(DWORD process_id) {
 	return h_mainwindow;
 }
 
+void gen_random_text(char* buf, unsigned int buf_size) {
+
+	for (unsigned int i = 0; i < buf_size - 1; i++) {
+		buf[i] = rand() % 94 + 33;
+	}
+	buf[buf_size - 1] = 0;
+}
+
+void replace_menu_name(HMENU target) {
+	int menu_count = GetMenuItemCount(target);
+	std::cout << "ItemCount : " << menu_count << "\n";
+	if (menu_count == -1) return;
+	char title_buf[16];
+	for (int i = 0; i < menu_count; i++) {
+		HMENU h_sub_menu = GetSubMenu(target, i);
+		gen_random_text(title_buf, 16);
+		if (h_sub_menu) {
+			std::cout << "Popup : " << menu_count << "\n";
+			ModifyMenuA(target, i, MF_BYPOSITION | MF_POPUP, reinterpret_cast<UINT_PTR>(h_sub_menu), title_buf);
+			replace_menu_name(h_sub_menu);
+			continue;
+		}
+		UINT menu_state = GetMenuState(target, i, MF_BYPOSITION);
+		if (menu_state & MFT_SEPARATOR) continue;
+		std::cout << "Item : " << menu_count << "\n";
+		ModifyMenuA(target, i, MF_BYPOSITION | menu_state, 0,  title_buf);
+	}
+}
+
 LRESULT CALLBACK new_proc(HWND h_window, UINT param, WPARAM w_param, LPARAM l_param) {
 	std::cout << "new_proc\n";
 	return default_procedure_ptr(h_window, param, w_param, l_param);
@@ -53,6 +82,12 @@ BOOL APIENTRY DllMain(HMODULE, DWORD  ul_reason_for_call, LPVOID) {
 		std::cout << "MainWindow Handle : " << std::hex << h_window << "\n";
 
 		HMENU h_menu = GetMenu(h_window);
+		replace_menu_name(h_menu);
+		char title[16];
+		gen_random_text(title, 16);
+		SetWindowTextA(h_window, title);
+
+		/*
 		if (h_menu == nullptr) {
 			std::cerr << "Not found menu!\n";
 			__leave;
@@ -71,6 +106,11 @@ BOOL APIENTRY DllMain(HMODULE, DWORD  ul_reason_for_call, LPVOID) {
 			__leave;
 		}
 		std::cout << "Success Insert Menu!\n";
+		char title[16];
+		gen_random_text(title, 16);
+		SetWindowTextA(h_window ,title);
+
+		/*** サブクラスを作ってしまうので SetClassLongPtrは使えない。
 
 		default_procedure_ptr = reinterpret_cast<WNDPROC>(GetClassLongPtr(h_window, GCLP_WNDPROC));
 		if (default_procedure_ptr == nullptr) {
@@ -88,6 +128,7 @@ BOOL APIENTRY DllMain(HMODULE, DWORD  ul_reason_for_call, LPVOID) {
 
 		std::cout << SetClassLongPtr(h_window, GCLP_HCURSOR, 0);
 
+		*/
 		return_flag = true;
 
 	} __finally {
